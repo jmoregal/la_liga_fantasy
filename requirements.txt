@@ -1,0 +1,14 @@
+pandas
+numpy
+scikit-learn
+matplotlib
+tqdm
+pyarrow
+requests
+beautifulsoup4
+lxml
+torch
+torchvision
+xgboost
+lightgbm
+streamlit
