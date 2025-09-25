@@ -31,12 +31,17 @@ def obtain_data(url ,save_dir='../data/raw'):
     comments = soup.find_all(string=lambda text: isinstance(text, Comment))
     for c in comments:
         try:
-            print(c)
             dfs_comment = pd.read_html(c)
             dataframes.extend(dfs_comment)
         except ValueError:
             # si no hay tablas en ese comentario, pasa
             pass
+    links = []
+    for a in soup.find_all("a", href=True):
+        if a["href"].startswith("/en/players/") and len(a["href"])>20:
+            full_url = a["href"]
+            links.append(full_url)
+            print(full_url)
     print(f"Se han encontrado {len(dataframes)} tablas en total")
 
     # Creamos un diccionario con las tablas y sus nombres
@@ -61,13 +66,12 @@ def player_matches_scrap(df, save_dir='../data/raw'):
         # all_logs.append(match_log)
         time.sleep(0.5)  # Pausa para no saturar 
 
-
 _ = obtain_data(url='https://fbref.com/en/comps/12/stats/La-Liga-Stats', )
 prueba = pd.read_parquet('data/raw/fbref_players_stats.parquet')
 
 # print(prueba.columns)
-print(prueba.head(3))
-player_matches_scrap(prueba)
+# print(prueba.head(3))
+# player_matches_scrap(prueba)
 
 # if __name__ == '__main__':
 
