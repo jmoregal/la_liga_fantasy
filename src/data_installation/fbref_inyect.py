@@ -2,6 +2,7 @@ import pandas as pd
 from bs4 import BeautifulSoup, Comment
 import os
 import requests
+import time
 
 all_logs = []
 
@@ -50,55 +51,59 @@ def obtain_data(url ,save_dir='../data/raw'):
     return dataframes
 
 def player_matches_scrap(df, save_dir='../data/raw'):
-    for _, rows in df.iterrows():
-        player_id = rows['(\'Unnamed: 1_level_0\', \'Player\')']
-        url = rows['(\'Unnamed: 36_level_0\', \'Matches\')']
-        print(url)
-        
-        html = requests.get(url).text
-        tables = pd.read_html(html)
-        match_log = tables[0]
-        match_log['Player'] = player_id
-        match_log['Squad'] = rows['(\'Unnamed: 4_level_0\', \'Squad\')']
+    rows = []
+    for tr in df.find_all("tr"):
+        row = []
+        for td in tr.find_all(["td", "th"]):
+            link = td.find("a")
+            if link:
+                # Guardar tanto el texto como el link
+                row.append((link.text.strip(), link["href"]))
+            else:
+                row.append(td.get_text(strip=True))
+        rows.append(row)
+    player_matches_df = pd.DataFrame(rows)
+    player_matches_df = player_matches_df['']
 
-        print(f"Procesando jugador: {player_id}, partidos: {len(match_log)}")
 
-        # all_logs.append(match_log)
-        time.sleep(0.5)  # Pausa para no saturar 
 
-_ = obtain_data(url='https://fbref.com/en/comps/12/stats/La-Liga-Stats', )
-prueba = pd.read_parquet('data/raw/fbref_players_stats.parquet')
+def read_html_tables(file_path):
+    # Reads an HTML file already saved locally, and returns all tables as a list of DataFrames.
+    with open(file_path, 'r', encoding='utf-8') as file:
+        html_content = file.read()
+    tables = pd.read_html(html_content)
+    return tables
 
 # print(prueba.columns)
 # print(prueba.head(3))
 # player_matches_scrap(prueba)
 
-# if __name__ == '__main__':
+if __name__ == '__main__':
 
-#     # tabla con estadisticas de jugadores y plantillas
-#     tables_stats = obtain_data(url='https://fbref.com/en/comps/12/stats/La-Liga-Stats', )
-#     players_stats = tables_stats[2]
-#     squads_stats = tables_stats[0]
+    # tabla con estadisticas de jugadores y plantillas
+    tables_stats = read_html_tables('html.txt')
+    players_stats = tables_stats[2]
+    squads_stats = tables_stats[0]
 
-#     players_stats.to_parquet('data/raw/fbref_players_stats.parquet', index=False)
-#     squads_stats.to_parquet('data/raw/fbref_squads_stats.parquet', index=False)
+    players_stats.to_parquet('data/raw/fbref_players_stats.parquet', index=False)
+    squads_stats.to_parquet('data/raw/fbref_squads_stats.parquet', index=False)
 
-#     # tabla con clasificación general, local|visitante 
-#     tables_rankings = obtain_data(url='https://fbref.com/en/comps/12/La-Liga-Stats', )
-#     ranking_general = tables_stats[0]
-#     ranking_home_away = tables_stats[1]
+    # tabla con clasificación general, local|visitante 
+    tables_rankings = obtain_data(url='https://fbref.com/en/comps/12/La-Liga-Stats', )
+    ranking_general = tables_stats[0]
+    ranking_home_away = tables_stats[1]
 
-#     ranking_general.to_parquet('data/raw/fbref_ranking_general.parquet', index=False)
-#     ranking_home_away.to_parquet('data/raw/fbref_ranking_home_away.parquet', index=False)
+    ranking_general.to_parquet('data/raw/fbref_ranking_general.parquet', index=False)
+    ranking_home_away.to_parquet('data/raw/fbref_ranking_home_away.parquet', index=False)
 
-#     # tabla con resultados de partidos
-#     tables_results = obtain_data(url='https://fbref.com/en/comps/12/schedule/La-Liga-Scores-and-Fixtures', )
-#     results = tables_results[0]
+    # tabla con resultados de partidos
+    tables_results = obtain_data(url='https://fbref.com/en/comps/12/schedule/La-Liga-Scores-and-Fixtures', )
+    results = tables_results[0]
 
-#     results.to_parquet('data/raw/fbref_results.parquet', index=False)
+    results.to_parquet('data/raw/fbref_results.parquet', index=False)
     
-#     # tabla jugador-partidos
-#     player_match_stats = player_matches_scrap(players_stats)
+    # tabla jugador-partidos
+    player_match_stats = player_matches_scrap(players_stats)
 
 
 # print(players_stats.head())
