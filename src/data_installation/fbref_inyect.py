@@ -94,12 +94,13 @@ def clean_squads_stats(table):
     return df
 
 
-def player_matches_scrap(players_df, save_dir='../data/raw/players_matches'):
-    os.makedirs(save_dir, exist_ok=True)
+def player_matches_scrap(players_df, save_path='data/raw/fbref_player_matches.parquet'):
+    all_player_matches = []
     headers = {"User-Agent": "Mozilla/5.0"}
-    
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+
     for _, row in players_df.iterrows():
-        player_name = row["Player"].replace(" ", "_")
+        player_name = row["Player"]
         url = row["Matches"]
         
         if url is None:
@@ -111,19 +112,28 @@ def player_matches_scrap(players_df, save_dir='../data/raw/players_matches'):
             print(f"⚠️ No se pudo obtener {player_name}")
             continue
         
-        soup = BeautifulSoup(response.text, "html.parser")
         tables = pd.read_html(response.text)
-        
-        # Si hay varias tablas, cogemos la primera con partidos
         if len(tables) == 0:
             continue
         
         df_matches = tables[0]
-        print(df_matches.head())
-        df_matches.to_parquet(os.path.join(save_dir, f"data/raw/{player_name}_matches.parquet"), index=False)
+        # Añadimos contexto del jugador
+        df_matches["Player"] = player_name
+        df_matches["PlayerLink"] = url
         
-        print(f"✔ Guardados partidos de {player_name}")
-        time.sleep(1)  # para no saturar fbref
+        all_player_matches.append(df_matches)
+        time.sleep(1.5)  # respeto al servidor
+    
+    # Concatenar todo en un único DataFrame
+    if all_player_matches:
+        big_df = pd.concat(all_player_matches, ignore_index=True)
+        big_df.to_parquet(save_path, index=False)
+        print(f"✔ Guardada tabla consolidada en {save_path}")
+        return big_df
+    else:
+        print("⚠️ No se pudo obtener ningún partido")
+        return pd.DataFrame()
+
 
 
 if __name__ == '__main__':
