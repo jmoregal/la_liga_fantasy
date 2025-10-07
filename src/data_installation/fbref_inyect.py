@@ -109,7 +109,7 @@ def player_matches_scrap(players_df, save_path='data/raw/fbref_player_matches.pa
         full_url = f"https://fbref.com{url}"
         response = requests.get(full_url, headers=headers)
         if response.status_code != 200:
-            print(f"⚠️ No se pudo obtener {player_name}")
+            print(f"⚠️ No se pudo obtener {player_name}, respuesta {response.status_code}")
             continue
         
         tables = pd.read_html(response.text)
@@ -122,7 +122,7 @@ def player_matches_scrap(players_df, save_path='data/raw/fbref_player_matches.pa
         df_matches["PlayerLink"] = url
         
         all_player_matches.append(df_matches)
-        time.sleep(1.5)  # respeto al servidor
+        time.sleep(random.uniform(3, 8))  # respeto al servidor
     
     # Concatenar todo en un único DataFrame
     if all_player_matches:
