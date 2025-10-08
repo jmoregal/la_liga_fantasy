@@ -4,6 +4,7 @@ import os
 import requests
 import time
 import random
+from tqdm import tqdm  # para barra de progreso
 
 USER_AGENTS = [
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36",
@@ -95,44 +96,84 @@ def clean_squads_stats(table):
 
 
 def player_matches_scrap(players_df, save_path='data/raw/fbref_player_matches.parquet'):
+    """
+    Scrap de partidos de jugadores de FBref y guarda un DataFrame consolidado en Parquet.
+    Muestra barra de progreso con tiempo estimado restante.
+    """
     all_player_matches = []
     headers = {"User-Agent": "Mozilla/5.0"}
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
-    for _, row in players_df.iterrows():
-        player_name = row["Player"]
-        url = row["Matches"]
-        
-        if url is None:
+    total_players = len(players_df)
+    start_time = time.time()
+
+    # tqdm para barra de progreso
+    for i, row in enumerate(tqdm(players_df.itertuples(index=False), total=total_players, desc="Scraping jugadores")):
+        # print(i)
+        # if i==2:
+        #     break
+        player_name = getattr(row, "Player")
+        url = getattr(row, "Matches")
+
+        if pd.isna(url):
             continue
-        
+
         full_url = f"https://fbref.com{url}"
         response = requests.get(full_url, headers=headers)
         if response.status_code != 200:
             print(f"⚠️ No se pudo obtener {player_name}, respuesta {response.status_code}")
             continue
-        
+
         tables = pd.read_html(response.text)
         if len(tables) == 0:
             continue
-        
+
         df_matches = tables[0]
-        # Añadimos contexto del jugador
+
+        # 🔹 Aplanar columnas MultiIndex y limpiar nombres
+        if isinstance(df_matches.columns, pd.MultiIndex):
+            new_cols = []
+            for col in df_matches.columns:
+                if col[0].startswith("Unnamed"):
+                    new_cols.append(col[1])
+                else:
+                    new_cols.append(f"{col[0]}_{col[1]}" if col[1] else col[0])
+            df_matches.columns = new_cols
+
+        # 🔹 Añadir contexto del jugador
         df_matches["Player"] = player_name
         df_matches["PlayerLink"] = url
-        
+
         all_player_matches.append(df_matches)
-        time.sleep(random.uniform(3, 8))  # respeto al servidor
-    
-    # Concatenar todo en un único DataFrame
+
+        # 🔹 Retraso aleatorio
+        time.sleep(random.uniform(3, 8))
+
+        # 🔹 Actualizar tiempo estimado restante en tqdm
+        elapsed = time.time() - start_time
+        avg_time_per_player = elapsed / (i + 1)
+        remaining_time_sec = avg_time_per_player * (total_players - (i + 1))
+        mins, secs = divmod(int(remaining_time_sec), 60)
+        tqdm.write(f"⏳ Tiempo estimado restante: {mins}m {secs}s")
+
+    # 🔹 Concatenar todo
     if all_player_matches:
         big_df = pd.concat(all_player_matches, ignore_index=True)
+
+        # 🔹 Conversión segura de tipos para Parquet
+        for col in big_df.columns:
+            try:
+                big_df[col] = pd.to_numeric(big_df[col])
+            except:
+                big_df[col] = big_df[col].astype(str)
+
         big_df.to_parquet(save_path, index=False)
         print(f"✔ Guardada tabla consolidada en {save_path}")
         return big_df
     else:
         print("⚠️ No se pudo obtener ningún partido")
         return pd.DataFrame()
+
 
 
 
@@ -163,4 +204,5 @@ if __name__ == '__main__':
     results.to_parquet('data/raw/fbref_results.parquet', index=False)
     
     # 4. Partidos por jugador
-    player_matches_scrap(players_stats)
+    tables_compleja = player_matches_scrap(players_stats)
+    tables_compleja.to_parquet('data/raw/fbref_player_matches.parquet', index=False)
