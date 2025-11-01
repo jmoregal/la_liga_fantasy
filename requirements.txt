@@ -12,3 +12,5 @@ torchvision
 xgboost
 lightgbm
 streamlit
+ipykernel
+openpyxl
